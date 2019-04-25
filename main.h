@@ -2,10 +2,11 @@
 #define Main_h
 
 //#define LOGGING
-#define DHTTYPE DHT22     // Sensor type DHT11/21/22/AM2301/AM2302
-#define DHTPIN  D1        // Digital pin for communications
+// #define DHTTYPE DHT22     // Sensor type DHT11/21/22/AM2301/AM2302
+// #define DHTPIN  D1        // Digital pin for communications
+#define BME_CS A2
 #define UNSET   -100      // A variable that wont be used by power, temperature (i hope), or humidity
-#define ENVIORNMENT_INTERVAL  300000UL // 5 minutes
+#define ENVIORNMENT_INTERVAL  30000UL // 30 seconds
 #define PUSH_RESULTS_INTERVAL 10000UL
 #define LIGHTSENSORPIN  A0
 
@@ -21,15 +22,14 @@
 
 // If Content-Length isn't given this is used for the body length increments
 const int kFallbackContentLength = 100;
-static const char apikey[] = "MYEMONCMSAPIKEY";
 
 typedef struct
 {
   String hostname;
   IPAddress ip;
-  String path;
+  char path[200];
   int port;
-  String body;
+  char body[200];
 } http_request_t;
 
 /**
@@ -40,7 +40,7 @@ typedef struct
 typedef struct
 {
   int status;
-  String body;
+  char body[200];
 } http_response_t;
 
 #endif
