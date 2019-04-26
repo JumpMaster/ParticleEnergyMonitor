@@ -8,16 +8,9 @@
 #include "SparkFunBME280.h"
 #include "secrets.h"
 
-void lightSensorISR();
-void doGetRequest();
-void sendData(float power, float temperature, float humidity, float pressure);
+//  Stubs
 void mqttCallback(char* topic, byte* payload, unsigned int length);
-void random_seed_from_cloud(unsigned seed);
-int roundFloat(float x);
-void connectToMQTT();
-void setup();
-void loop();
-#line 11 "c:/Users/kevin/Documents/GitHub/ParticleEnergyMonitor/particleenergymonitor.ino"
+
 float temperature = UNSET;
 float humidity = UNSET;
 float pressure = UNSET;
