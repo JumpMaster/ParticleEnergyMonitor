@@ -7,7 +7,7 @@ extern PublishQueue pq;
 PresenceManager::PresenceManager() { }
 
 void PresenceManager::subscribe() {
-    bool result = Particle.subscribe("presence", &PresenceManager::handler, this, MY_DEVICES);
+    Particle.subscribe("presence", &PresenceManager::handler, this, MY_DEVICES);
 
     /*
     if (result)
@@ -42,7 +42,7 @@ void PresenceManager::PublishUser(User *user) {
 }
 
 void PresenceManager::PublishUsers() {
-    for (int i = 0; i < users.size(); i++)
+    for (unsigned int i = 0; i < users.size(); i++)
         PublishUser(&users[i]);
 }
 
@@ -83,7 +83,7 @@ void PresenceManager::handler(const char *eventName, const char *data) {
                     ExportUser(name, location);
             }
 
-            for (int i = 0; i < users.size(); i++) {
+            for (unsigned int i = 0; i < users.size(); i++) {
                 if (strcmp(users[i].name, name) == 0) {
                     if (updated > users[i].lastUpdated) {
                         users[i].lastUpdated = updated;
@@ -110,7 +110,7 @@ void PresenceManager::handler(const char *eventName, const char *data) {
         } else if (strcmp(requestType, "remove") == 0) {
             const char* name = jsonRoot["user"];
         
-            for (int i = 0; i < users.size(); i++) {
+            for (unsigned int i = 0; i < users.size(); i++) {
                 if (strcmp(users[i].name, name) == 0) {
                     users.erase(users.begin() + i);
                 }
@@ -177,7 +177,7 @@ void PresenceManager::handler(const char *eventName, const char *data) {
 }
 
 bool PresenceManager::isAnyone(const char *location) {
-    for (int i = 0; i < users.size(); i++) {
+    for (unsigned int i = 0; i < users.size(); i++) {
         if (strcmp(users[i].location, location) == 0)
             return true;
     }
@@ -186,7 +186,7 @@ bool PresenceManager::isAnyone(const char *location) {
 }
 
 bool PresenceManager::isEveryone(const char *location) {
-    for (int i = 0; i < users.size(); i++) {
+    for (unsigned int i = 0; i < users.size(); i++) {
         if (strcmp(users[i].location, location) != 0)
             return false;
     }
@@ -195,7 +195,7 @@ bool PresenceManager::isEveryone(const char *location) {
 }
 
 bool PresenceManager::isUser(const char *user, const char *location) {
-    for (int i = 0; i < users.size(); i++) {
+    for (unsigned int i = 0; i < users.size(); i++) {
         if (strcmp(users[i].name, user) == 0 && strcmp(users[i].location, location) == 0)
             return true;
     }
@@ -204,10 +204,10 @@ bool PresenceManager::isUser(const char *user, const char *location) {
 }
 
 char *PresenceManager::whereIs(const char *name) {
-    for (int i = 0; i < users.size(); i++) {
+    for (unsigned int i = 0; i < users.size(); i++) {
         if (strcmp(users[i].name, name) == 0)
             return users[i].location;
     }
     
-    return "";
+    return NULL;
 }

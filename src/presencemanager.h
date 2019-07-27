@@ -36,7 +36,7 @@ class PresenceManager
     unsigned long lastMasterUpdate;
     int nodeID;
     int masterID;
-    int clusterUsers;
+    unsigned int clusterUsers;
 };
 
 #endif  // End of __PRESENCEMANAGER_H__ definition check
