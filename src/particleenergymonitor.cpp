@@ -1,7 +1,7 @@
 #include "papertrail.h"
 #include "mqtt.h"
 #include "application.h"
-#include "main.h"
+#include "particleenergymonitor.h"
 #include "Adafruit_BME280.h"
 #include "Adafruit_Sensor.h"
 #include "secrets.h"
@@ -12,7 +12,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 double temperature = UNSET;
 int humidity = UNSET;
 int pressure = UNSET;
-
 volatile int power = UNSET;
 bool bmePresent = false;
 
@@ -42,7 +41,6 @@ ApplicationWatchdog wd(60000, System.reset);
 
 void lightSensorISR() {
 
-  LOGGING_PRINTLN("LIGHT FLASHED");
   unsigned long currenttime = millis();
   if (lastWattUsedTime > 0) {
     power = 3600000 / (currenttime - lastWattUsedTime);
@@ -53,14 +51,14 @@ void lightSensorISR() {
   lastWattUsedTime = currenttime;
 }
 
-void sendData(float power, double temperature, int humidity, int pressure) {
+void sendData() {
 
     if (mqttClient.isConnected()) {
         char charPower[5];
         char charTemperature[6];
         char charHumidity[6];
         char charPressure[7];
-        snprintf(charPower, sizeof(charPower), "%.0f", power);
+        snprintf(charPower, sizeof(charPower), "%d", power);
         snprintf(charTemperature, sizeof(charTemperature), "%.1f", temperature);
         snprintf(charHumidity, sizeof(charHumidity), "%d", humidity);
         snprintf(charPressure, sizeof(charPressure), "%d", pressure);
@@ -95,14 +93,6 @@ void connectToMQTT() {
 
 void setup() {
 
-  #ifdef LOGGING
-    Serial.begin(9600);
-    while (!Serial.available()) {
-      LOGGING_PRINTLN("Press any key to start.");
-      delay (1000);
-    }
-  #endif
-
   pinMode(LIGHTSENSORPIN, INPUT);
   
   waitFor(Particle.connected, 30000);
@@ -132,13 +122,12 @@ void setup() {
 
   Particle.variable("resetTime", &resetTime, INT);
 
-  unsigned bmePresent = bme.begin();
+  bmePresent = bme.begin();
   if (!bmePresent) {
     Log.info("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
     Log.info("SensorID was: 0x%X", bme.sensorID());
   } else {
     Log.info("Valid BME280 sensor found");
-
     bme.setSampling(Adafruit_BME280::MODE_FORCED,
                     Adafruit_BME280::SAMPLING_X1, // temperature
                     Adafruit_BME280::SAMPLING_X1, // pressure
@@ -157,7 +146,7 @@ void loop() {
 
     if (currenttime > nextUpdateTime) {
         if (power != UNSET && temperature != UNSET && humidity != UNSET && pressure != UNSET) {
-          sendData(power, temperature, humidity, pressure);
+          sendData();
           nextUpdateTime = currenttime + PUSH_RESULTS_INTERVAL;
         }
     }
@@ -167,7 +156,7 @@ void loop() {
 
         bme.takeForcedMeasurement();
 
-        temperature = round(bme.readTemperature()*2.0) / 2.0;
+        temperature = round(bme.readTemperature()*10.0) / 10.0;
         humidity = (int) round(bme.readHumidity());
         pressure = (int) round(bme.readPressure() / 100.0F);
     }
