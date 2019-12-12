@@ -122,6 +122,8 @@ void setup() {
 
   Particle.variable("resetTime", &resetTime, INT);
 
+  Particle.publishVitals(900);
+
   bmePresent = bme.begin();
   if (!bmePresent) {
     Log.info("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
