@@ -91,6 +91,15 @@ void connectToMQTT() {
         Log.info("MQTT failed to connect");
 }
 
+int cloudReset(const char* data) {
+    uint32_t rTime = millis() + 10000;
+    Log.info("Cloud reset received");
+    while (millis() < rTime)
+        Particle.process();
+    System.reset();
+    return 0;
+}
+
 void setup() {
 
   pinMode(LIGHTSENSORPIN, INPUT);
@@ -120,6 +129,7 @@ void setup() {
       resetCount = 0;
   }
 
+  Particle.function("cloudReset", cloudReset);
   Particle.variable("resetTime", &resetTime, INT);
 
   Particle.publishVitals(900);
