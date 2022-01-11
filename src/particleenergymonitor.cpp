@@ -5,6 +5,7 @@
 #include "Adafruit_BME280.h"
 #include "Adafruit_Sensor.h"
 #include "secrets.h"
+#include "DiagnosticsHelperRK.h"
 
 //  Stubs
 void mqttCallback(char* topic, byte* payload, unsigned int length);
@@ -77,11 +78,6 @@ void random_seed_from_cloud(unsigned seed) {
    srand(seed);
 }
 
-STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
-STARTUP(System.enableFeature(FEATURE_RESET_INFO));
-STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
-SYSTEM_THREAD(ENABLED);
-
 void connectToMQTT() {
     lastMqttConnectAttempt = millis();
     bool mqttConnected = mqttClient.connect(System.deviceID(), mqttUsername, mqttPassword);
@@ -89,6 +85,25 @@ void connectToMQTT() {
         Log.info("MQTT Connected");
     } else
         Log.info("MQTT failed to connect");
+}
+
+uint32_t nextMetricsUpdate = 0;
+void sendTelegrafMetrics() {
+    if (millis() > nextMetricsUpdate) {
+        nextMetricsUpdate = millis() + 30000;
+
+        char buffer[150];
+        snprintf(buffer, sizeof(buffer),
+            "status,device=Energy\\ Monitor uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memFree=%ld,ipv4=\"%s\"",
+            System.uptime(),
+            System.resetReason(),
+            System.version().c_str(),
+            DiagnosticsHelper::getValue(DIAG_ID_SYSTEM_TOTAL_RAM),
+            DiagnosticsHelper::getValue(DIAG_ID_SYSTEM_USED_RAM),
+            WiFi.localIP().toString().c_str()
+            );
+        mqttClient.publish("telegraf/particle", buffer);
+    }
 }
 
 int cloudReset(const char* data) {
@@ -100,57 +115,66 @@ int cloudReset(const char* data) {
     return 0;
 }
 
+SYSTEM_THREAD(ENABLED)
+
+void startupMacro() {
+    WiFi.selectAntenna(ANT_EXTERNAL);
+    System.enableFeature(FEATURE_RESET_INFO);
+    System.enableFeature(FEATURE_RETAINED_MEMORY);
+}
+STARTUP(startupMacro());
+
 void setup() {
 
-  pinMode(LIGHTSENSORPIN, INPUT);
+    pinMode(LIGHTSENSORPIN, INPUT);
   
-  waitFor(Particle.connected, 30000);
+    waitFor(Particle.connected, 30000);
+
+    do {
+        resetTime = Time.now();
+        Particle.process();
+    } while (resetTime < 1500000000 || millis() < 10000);
+
+    if (System.resetReason() == RESET_REASON_PANIC) {
+        if ((Time.now() - lastHardResetTime) < 120) {
+            resetCount++;
+        } else {
+            resetCount = 1;
+        }
+
+        lastHardResetTime = Time.now();
+
+        if (resetCount > 3) {
+            System.enterSafeMode();
+        }
+    } else if (System.resetReason() == RESET_REASON_WATCHDOG) {
+        Log.info("RESET BY WATCHDOG");
+    } else {
+        resetCount = 0;
+    }
+
+    Particle.function("cloudReset", cloudReset);
+    Particle.variable("resetTime", &resetTime, INT);
+
+    Particle.publishVitals(900);
+
+    bmePresent = bme.begin();
+    if (!bmePresent) {
+        Log.info("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+        Log.info("SensorID was: 0x%X", bme.sensorID());
+    } else {
+        Log.info("Valid BME280 sensor found");
+        bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                        Adafruit_BME280::SAMPLING_X1, // temperature
+                        Adafruit_BME280::SAMPLING_X1, // pressure
+                        Adafruit_BME280::SAMPLING_X1, // humidity
+                        Adafruit_BME280::FILTER_OFF);
+    }
   
-  if (!Particle.connected)
-      System.reset();
-  do {
-      resetTime = Time.now();
-      delay(10);
-  } while (resetTime < 1000000UL && millis() < 20000);
-
-  if (System.resetReason() == RESET_REASON_PANIC) {
-      if ((Time.now() - lastHardResetTime) < 120) {
-          resetCount++;
-      } else {
-          resetCount = 1;
-      }
-
-      lastHardResetTime = Time.now();
-
-      if (resetCount > 3) {
-          System.enterSafeMode();
-      }
-  } else {
-      resetCount = 0;
-  }
-
-  Particle.function("cloudReset", cloudReset);
-  Particle.variable("resetTime", &resetTime, INT);
-
-  Particle.publishVitals(900);
-
-  bmePresent = bme.begin();
-  if (!bmePresent) {
-    Log.info("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
-    Log.info("SensorID was: 0x%X", bme.sensorID());
-  } else {
-    Log.info("Valid BME280 sensor found");
-    bme.setSampling(Adafruit_BME280::MODE_FORCED,
-                    Adafruit_BME280::SAMPLING_X1, // temperature
-                    Adafruit_BME280::SAMPLING_X1, // pressure
-                    Adafruit_BME280::SAMPLING_X1, // humidity
-                    Adafruit_BME280::FILTER_OFF);
-  }
-  
-  attachInterrupt(LIGHTSENSORPIN, lightSensorISR, FALLING);
-  uint32_t resetReasonData = System.resetReasonData();
-  connectToMQTT();
-  Particle.publish("pushover", String::format("EnergyMonitor: Boot complete: %d-%d", System.resetReason(), resetReasonData).c_str(), PRIVATE);
+    attachInterrupt(LIGHTSENSORPIN, lightSensorISR, FALLING);
+    uint32_t resetReasonData = System.resetReasonData();
+    connectToMQTT();
+    Particle.publish("pushover", String::format("EnergyMonitor: Boot complete: %d-%d", System.resetReason(), resetReasonData).c_str(), PRIVATE);
 }
 
 void loop() {
@@ -175,6 +199,7 @@ void loop() {
 
     if (mqttClient.isConnected()) {
         mqttClient.loop();
+        sendTelegrafMetrics();
     } else if (millis() > (lastMqttConnectAttempt + mqttConnectAtemptTimeout)) {
         Log.info("MQTT Disconnected");
         connectToMQTT();
