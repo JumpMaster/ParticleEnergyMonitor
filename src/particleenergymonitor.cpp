@@ -13,7 +13,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 double temperature = UNSET;
 int humidity = UNSET;
 int pressure = UNSET;
-volatile int power = UNSET;
+volatile int powerWatts = UNSET;
 bool bmePresent = false;
 
 volatile unsigned long lastWattUsedTime = 0;
@@ -44,7 +44,7 @@ void lightSensorISR() {
 
   unsigned long currenttime = millis();
   if (lastWattUsedTime > 0) {
-    power = 3600000 / (currenttime - lastWattUsedTime);
+    powerWatts = 3600000 / (currenttime - lastWattUsedTime);
 
     // power_count++;
     // avg_power += (power - avg_power) / power_count;
@@ -59,7 +59,7 @@ void sendData() {
         char charTemperature[6];
         char charHumidity[6];
         char charPressure[7];
-        snprintf(charPower, sizeof(charPower), "%d", power);
+        snprintf(charPower, sizeof(charPower), "%d", powerWatts);
         snprintf(charTemperature, sizeof(charTemperature), "%.1f", temperature);
         snprintf(charHumidity, sizeof(charHumidity), "%d", humidity);
         snprintf(charPressure, sizeof(charPressure), "%d", pressure);
@@ -94,7 +94,7 @@ void sendTelegrafMetrics() {
 
         char buffer[150];
         snprintf(buffer, sizeof(buffer),
-            "status,device=Energy\\ Monitor uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memFree=%ld,ipv4=\"%s\"",
+            "status,device=Energy\\ Monitor uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memUsed=%ld,ipv4=\"%s\"",
             System.uptime(),
             System.resetReason(),
             System.version().c_str(),
@@ -181,7 +181,7 @@ void loop() {
     unsigned long currenttime = millis();
 
     if (currenttime > nextUpdateTime) {
-        if (power != UNSET && temperature != UNSET && humidity != UNSET && pressure != UNSET) {
+        if (powerWatts != UNSET && temperature != UNSET && humidity != UNSET && pressure != UNSET) {
           sendData();
           nextUpdateTime = currenttime + PUSH_RESULTS_INTERVAL;
         }
